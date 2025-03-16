@@ -1,43 +1,81 @@
 pipeline {
     agent any
-
+    environment {
+        SONARQUBE_URL = "http://13.53.123.95:9000"
+    }
+    parameters {
+        string(name: 'DEPLOY_ENV', defaultValue: 'dev', description: 'Deployment Environment')
+        string(name: 'BRANCH', defaultValue: 'dev', description: 'Git Branch to build')
+    }
     stages {
         stage('Checkout Code') {
             steps {
                 script {
-                    // If repo is private, add credentialsId
-                    git branch: 'dev', 
-                        url: 'https://github.com/SASowah/numbers-guess-gameApp.git'
+                    git branch: "dev",
+                        url: 'https://github.com/saakanbi/numbers-guess-gameApp.git'
                 }
             }
         }
-        
         stage('Build') {
             steps {
-                sh 'mvn clean package'
+                sh 'mvn clean package -DskipTests'
             }
         }
-
         stage('Test') {
             steps {
                 sh 'mvn test'
             }
         }
-
-        stage('Deploy') {
+        stage('SonarQube Analysis') {
             steps {
-                echo 'Deploying Application...'
+                script {
+                    withSonarQubeEnv('sonarqube-token') {
+                        sh '''
+                        mvn sonar:sonar \
+                        -Dsonar.projectKey=NumbersGuessGame \
+                        -Dsonar.projectName="NumbersGuessGame" \
+                        -Dsonar.host.url=${SONARQUBE_URL} \
+                        -Dsonar.login=${SONAR_AUTH_TOKEN}
+                        '''
+                    }
+                }
+            }
+        }
+        stage('Deploy to Tomcat') {
+            steps {
+                script {
+                    deploy adapters: [tomcat7(
+                        credentialsId: 'TOMCATID',
+                        path: '',
+                        url: 'http://3.142.36.180:8080'
+                    )],
+                    contextPath: 'numbers-game', war: 'target/*.war'
+                }
             }
         }
     }
-
-    // ✅ Added post section for notifications & cleanup
     post {
         success {
-            echo '✅ Build and Deployment Successful!'
+            echo ':white_check_mark: Build, Testing, SonarQube Analysis, and Deployment Successful!'
         }
         failure {
-            echo '❌ Build Failed! Check logs for issues.'
+            echo ':x: Build Failed! Check logs for issues.'
         }
     }
 }
+
+React
+
+Reply
+
+
+
+
+
+
+
+
+
+
+
+
